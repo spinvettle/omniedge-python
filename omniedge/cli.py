@@ -6,15 +6,24 @@ import sys
 import urllib.error
 import urllib.request
 from datetime import datetime
-from getpass import getpass
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
 
+from omniedge.terminal import (
+    FG_RED,
+    FG_CYAN,
+    ToolName,
+    _style,
+    error,
+    header,
+    info,
+    prompt_secret,
+    prompt_text,
+    success,
+    warning,
+)
 from omniedge.tools.base import ToolConfigSetResult, ToolIntegration
 from omniedge.tools.claude_code import ClaudeCodeIntegration
-
-
-ToolName = str
 
 
 class ToolRegistry:
@@ -50,21 +59,21 @@ def masked_key(key: str, visible: int = 4) -> str:
 
 def prompt_choice(prompt: str, options: List[str]) -> str:
     for idx, value in enumerate(options, start=1):
-        print(f"{idx}) {value}")
+        print(_style(f"{idx})", FG_CYAN), value)
     while True:
-        selection = input(f"{prompt} (enter number): ").strip()
+        selection = prompt_text(f"{prompt} (enter number): ")
         if not selection.isdigit():
-            print("Please enter a valid number.")
+            error("Please enter a valid number.")
             continue
         num = int(selection)
         if 1 <= num <= len(options):
             return options[num - 1]
-        print("Selection out of range, try again.")
+        error("Selection out of range, try again.")
 
 
 def prompt_yes_no(prompt: str, default_no: bool = True) -> bool:
     suffix = "[y/N]" if default_no else "[Y/n]"
-    answer = input(f"{prompt} {suffix}: ").strip().lower()
+    answer = prompt_text(f"{prompt} {suffix}: ").lower()
     if not answer:
         return not default_no
     return answer in ("y", "yes")
@@ -78,13 +87,16 @@ def fetch_models(base_url: str, api_key: str, timeout: int = 5) -> List[str]:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             payload = resp.read()
     except (urllib.error.URLError, TimeoutError) as exc:
-        print(f"Failed to fetch model list from {url} ({exc}). You can enter a model manually.")
+        error(
+            f"Failed to fetch model list from {url} ({exc}). "
+            "You can enter a model manually."
+        )
         return []
 
     try:
         data = json.loads(payload.decode("utf-8"))
     except json.JSONDecodeError:
-        print("Model list response is not valid JSON. Skipping automatic selection.")
+        error("Model list response is not valid JSON. Skipping automatic selection.")
         return []
 
     if isinstance(data, list) and all(isinstance(item, str) for item in data):
@@ -97,7 +109,7 @@ def fetch_models(base_url: str, api_key: str, timeout: int = 5) -> List[str]:
             elif isinstance(item, str):
                 models.append(item)
         return models
-    print("Could not parse model list from response. Please enter a model manually.")
+    error("Could not parse model list from response. Please enter a model manually.")
     return []
 
 
@@ -108,9 +120,9 @@ def choose_model(base_url: str, api_key: str, preset: Optional[str]) -> str:
     if models:
         choice = prompt_choice("Select model", models)
         return choice
-    manual = input("Enter model name: ").strip()
+    manual = prompt_text("Enter model name: ")
     while not manual:
-        manual = input("Model name cannot be empty. Enter model name: ").strip()
+        manual = prompt_text("Model name cannot be empty. Enter model name: ", color=FG_RED)
     return manual
 
 
@@ -129,9 +141,9 @@ def resolve_api_key(preset: Optional[str]) -> str:
         return env_key
     if preset:
         return preset
-    key = getpass("OMNIEDGE_API_KEY is not set. Enter API key: ").strip()
+    key = prompt_secret("OMNIEDGE_API_KEY is not set. Enter API key: ")
     while not key:
-        key = getpass("API key cannot be empty. Enter API key: ").strip()
+        key = prompt_secret("API key cannot be empty. Enter API key: ", color=FG_RED)
     return key
 
 
@@ -155,13 +167,13 @@ def handle_set(args: argparse.Namespace) -> None:
     base_url = resolve_base_url(args.base_url)
     model = choose_model(base_url, api_key, args.model)
 
-    print("\nConfiguration summary:")
+    header("\nConfiguration summary:")
     print(f"- Tool: {tool_name}")
     print(f"- Base URL: {base_url}")
     print(f"- Model: {model}")
     print(f"- API key: {masked_key(api_key)}")
     if not prompt_yes_no("Apply this configuration?"):
-        print("Cancelled.")
+        warning("Cancelled.")
         return
 
     result: ToolConfigSetResult = tool.set_config(
@@ -169,39 +181,39 @@ def handle_set(args: argparse.Namespace) -> None:
         api_key=api_key,
         model=model,
     )
-    print(f"Configuration written to: {result.target_path}")
+    success(f"Configuration written to: {result.target_path}")
     if result.backup_path:
-        print(f"Backup saved to: {result.backup_path}")
+        success(f"Backup saved to: {result.backup_path}")
 
 
 def handle_reset(args: argparse.Namespace) -> None:
     tool, tool_name = select_tool_name(args.tool)
     backups = tool.list_backups()
     if not backups:
-        print("No backups found for this tool.")
+        error("No backups found for this tool.")
         return
     backup_to_use = backups[-1]
     if len(backups) > 1:
-        print("Available backups:")
+        header("Available backups:")
         for idx, bkp in enumerate(backups, start=1):
             print(f"{idx}) {bkp}")
-        chosen = input(
+        chosen = prompt_text(
             f"Select backup to restore (default {len(backups)} = latest): "
-        ).strip()
+        )
         if chosen:
             if chosen.isdigit():
                 idx = int(chosen)
                 if 1 <= idx <= len(backups):
                     backup_to_use = backups[idx - 1]
             else:
-                print("Invalid input. Using latest backup.")
+                error("Invalid input. Using latest backup.")
 
-    print(f"\nWill restore from backup: {backup_to_use}")
+    info(f"\nWill restore from backup: {backup_to_use}")
     if not prompt_yes_no("Proceed with restore?"):
-        print("Cancelled.")
+        warning("Cancelled.")
         return
     target = tool.reset_config(backup_to_use)
-    print(f"Restore completed. Current config: {target}")
+    success(f"Restore completed. Current config: {target}")
 
 
 def build_parser() -> argparse.ArgumentParser:
