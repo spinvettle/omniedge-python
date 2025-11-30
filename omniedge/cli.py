@@ -241,18 +241,22 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: Optional[Sequence[str]] = None) -> None:
     parser = build_parser()
-    args = parser.parse_args(argv)
-    if not getattr(args, "command", None):
-        header("omniedge CLI")
-        info("Configure local dev tools to use OmniEdge.")
+    try:
+        args = parser.parse_args(argv)
+        if not getattr(args, "command", None):
+            header("omniedge CLI")
+            info("Configure local dev tools to use OmniEdge.")
+            print()
+            info("Common usage examples:")
+            print("  omniedge set claude-code")
+            print("  omniedge reset claude-code")
+            print()
+            info("Run 'omniedge -h' to see all options.")
+            return
+        args.func(args)
+    except KeyboardInterrupt:
         print()
-        info("Common usage examples:")
-        print("  omniedge set claude-code")
-        print("  omniedge reset claude-code")
-        print()
-        info("Run 'omniedge -h' to see all options.")
-        return
-    args.func(args)
+        warning("Goodbye. (Interrupted by Ctrl+C)")
 
 
 if __name__ == "__main__":
