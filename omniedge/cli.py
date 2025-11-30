@@ -221,7 +221,7 @@ def build_parser() -> argparse.ArgumentParser:
         prog="omniedge",
         description="OmniEdge CLI: configure local tools to use the OmniEdge API.",
     )
-    subparsers = parser.add_subparsers(dest="command", required=True)
+    subparsers = parser.add_subparsers(dest="command")
 
     set_parser = subparsers.add_parser("set", help="Write OmniEdge config for a tool")
     set_parser.add_argument("tool", nargs="?", help="Tool name, e.g. claude-code")
@@ -242,6 +242,16 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Optional[Sequence[str]] = None) -> None:
     parser = build_parser()
     args = parser.parse_args(argv)
+    if not getattr(args, "command", None):
+        header("omniedge CLI")
+        info("Configure local dev tools to use OmniEdge.")
+        print()
+        info("Common usage examples:")
+        print("  omniedge set claude-code")
+        print("  omniedge reset claude-code")
+        print()
+        info("Run 'omniedge -h' to see all options.")
+        return
     args.func(args)
 
 
