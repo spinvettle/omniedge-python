@@ -180,10 +180,10 @@ You can add support for new tools by following the same pattern as the Claude Co
 1. **Create a tool integration**
 
    - Add a module under `omniedge/tools/`, e.g. `omniedge/tools/my_tool.py`.
-   - Implement a class with the same interface as `ClaudeCodeIntegration`:
+   - Implement a class with the same interface as `ToolIntegration` in `omniedge/tools/base.py`:
      - `primary_name: str`
      - `aliases: List[str]`
-     - `set_config(base_url: str, api_key: str, model: str) -> ClaudeCodeSetResult`
+     - `set_config(base_url: str, api_key: str, model: str) -> ToolConfigSetResult`
      - `list_backups() -> List[Path]`
      - `reset_config(backup_path: Path) -> Path`
 

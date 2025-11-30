@@ -1,34 +1,12 @@
 import json
 import shutil
-from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
-from typing import List, Optional, Protocol
+from typing import Optional
+
+from .base import ToolConfigSetResult, ToolIntegration
 
 
-@dataclass
-class ClaudeCodeSetResult:
-    target_path: Path
-    backup_path: Optional[Path]
-
-
-class ClaudeCodeTool(Protocol):
-    primary_name: str
-    aliases: List[str]
-
-    def set_config(
-        self, *, base_url: str, api_key: str, model: str
-    ) -> ClaudeCodeSetResult:
-        ...
-
-    def list_backups(self) -> List[Path]:
-        ...
-
-    def reset_config(self, backup_path: Path) -> Path:
-        ...
-
-
-class ClaudeCodeIntegration:
+class ClaudeCodeIntegration(ToolIntegration):
     primary_name = "claude-code"
     aliases = ["claude-code", "claude", "claude_code"]
 
@@ -36,7 +14,7 @@ class ClaudeCodeIntegration:
         self._settings_path = Path.home() / ".claude" / "settings.json"
         self._backup_dir = Path.home() / ".omniedge" / "backup" / "claude-code"
 
-    def set_config(self, *, base_url: str, api_key: str, model: str) -> ClaudeCodeSetResult:
+    def set_config(self, *, base_url: str, api_key: str, model: str) -> ToolConfigSetResult:
         backup_path = self._create_backup_if_exists()
         data = self._read_settings()
         env = data.get("env")
@@ -57,28 +35,7 @@ class ClaudeCodeIntegration:
         with self._settings_path.open("w", encoding="utf-8") as fp:
             json.dump(data, fp, indent=2, ensure_ascii=False)
             fp.write("\n")
-        return ClaudeCodeSetResult(target_path=self._settings_path, backup_path=backup_path)
-
-    def list_backups(self) -> List[Path]:
-        if not self._backup_dir.exists():
-            return []
-        return sorted([p for p in self._backup_dir.iterdir() if p.is_file()])
-
-    def reset_config(self, backup_path: Path) -> Path:
-        if not backup_path.exists():
-            raise SystemExit(f"Backup file does not exist: {backup_path}")
-        self._settings_path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(backup_path, self._settings_path)
-        return self._settings_path
-
-    def _create_backup_if_exists(self) -> Optional[Path]:
-        if not self._settings_path.exists():
-            return None
-        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-        self._backup_dir.mkdir(parents=True, exist_ok=True)
-        backup_path = self._backup_dir / f"settings.json.{timestamp}.bak"
-        shutil.copy2(self._settings_path, backup_path)
-        return backup_path
+        return ToolConfigSetResult(target_path=self._settings_path, backup_path=backup_path)
 
     def _read_settings(self) -> dict:
         if not self._settings_path.exists():

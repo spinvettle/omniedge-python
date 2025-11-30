@@ -10,11 +10,8 @@ from getpass import getpass
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
 
-from omniedge.tools.claude_code import (
-    ClaudeCodeIntegration,
-    ClaudeCodeSetResult,
-    ClaudeCodeTool,
-)
+from omniedge.tools.base import ToolConfigSetResult, ToolIntegration
+from omniedge.tools.claude_code import ClaudeCodeIntegration
 
 
 ToolName = str
@@ -22,18 +19,17 @@ ToolName = str
 
 class ToolRegistry:
     def __init__(self) -> None:
-        self._registry: Dict[ToolName, ClaudeCodeTool] = {}
+        self._registry: Dict[ToolName, ToolIntegration] = {}
 
-    def register(self, name: ToolName, tool: ClaudeCodeTool) -> None:
+    def register(self, name: ToolName, tool: ToolIntegration) -> None:
         self._registry[name] = tool
-
-    def get(self, name: ToolName) -> Optional[ClaudeCodeTool]:
+    def get(self, name: ToolName) -> Optional[ToolIntegration]:
         return self._registry.get(name)
 
     def primary_names(self) -> List[ToolName]:
         return sorted({tool.primary_name for tool in self._registry.values()})
 
-    def resolve(self, name: ToolName) -> Optional[ClaudeCodeTool]:
+    def resolve(self, name: ToolName) -> Optional[ToolIntegration]:
         if name in self._registry:
             return self._registry[name]
         normalized = name.lower().replace("_", "-")
@@ -139,7 +135,7 @@ def resolve_api_key(preset: Optional[str]) -> str:
     return key
 
 
-def select_tool_name(arg_name: Optional[str]) -> Tuple[ClaudeCodeTool, str]:
+def select_tool_name(arg_name: Optional[str]) -> Tuple[ToolIntegration, str]:
     if arg_name:
         tool = TOOLS.resolve(arg_name)
         if tool:
@@ -168,7 +164,7 @@ def handle_set(args: argparse.Namespace) -> None:
         print("Cancelled.")
         return
 
-    result: ClaudeCodeSetResult = tool.set_config(
+    result: ToolConfigSetResult = tool.set_config(
         base_url=base_url,
         api_key=api_key,
         model=model,
